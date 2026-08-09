@@ -30,6 +30,10 @@ REPORT_REASON = "Cheating/Ban Evading"
 LIVE_SUBMIT = os.getenv("LIVE_SUBMIT", "false").strip().lower() in ("1", "true", "yes")
 
 # Pacing. These exist to keep the user account from looking scripted.
-MIN_DELAY_SECONDS = 4
-MAX_DELAY_SECONDS = 15
-MAX_REPORTS_PER_HOUR = 10
+#
+# The per-minute limit is enforced as a minimum gap plus jitter, never a fixed
+# 60s tick -- perfectly regular timing is itself the thing that looks automated.
+MIN_SECONDS_BETWEEN_REPORTS = 60
+MIN_DELAY_SECONDS = 4    # extra jitter added on top of the gap
+MAX_DELAY_SECONDS = 35
+MAX_REPORTS_PER_HOUR = 5

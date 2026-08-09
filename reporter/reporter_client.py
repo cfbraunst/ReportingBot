@@ -16,6 +16,7 @@ from reporter.config import (
     USER_TOKEN, TARGET_GUILD_ID, TARGET_CHANNEL_ID, TICKET_MESSAGE_ID,
     TICKET_BUTTON_CUSTOM_ID, REPORT_REASON, LIVE_SUBMIT,
     MIN_DELAY_SECONDS, MAX_DELAY_SECONDS, MAX_REPORTS_PER_HOUR,
+    MIN_SECONDS_BETWEEN_REPORTS,
 )
 from reporter.jobs import ReportJob, queue
 
@@ -43,6 +44,7 @@ class Reporter(selfcord.Client):
         self.notify = notify
         self._modal_waiter: asyncio.Future | None = None
         self._recent = deque()  # submission timestamps, for the hourly cap
+        self._last_submit: float | None = None  # for the per-minute gap
         self._halted = False
 
     async def on_ready(self) -> None:
@@ -83,12 +85,35 @@ class Reporter(selfcord.Client):
             log.exception("Failed to deliver notification: %s", text)
 
     async def _process(self, job: ReportJob) -> None:
-        self._enforce_rate_limit()
+        # Hourly cap: wait for a slot rather than halting, so a busy session
+        # doesn't require a restart.
+        wait = self.seconds_until_slot_free()
+        if wait > 0:
+            mins = wait / 60
+            log.info("Hourly cap reached; waiting %.1f min for a slot.", mins)
+            await self._notify_safe(
+                job,
+                f"⏳ Hourly cap reached ({MAX_REPORTS_PER_HOUR}/hr). "
+                f"This report is queued and will be filed in about {mins:.0f} min."
+            )
+            await asyncio.sleep(wait)
 
-        # Randomized, never fixed -- constant timing is the loudest script tell.
-        delay = random.uniform(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS)
-        log.info("Waiting %.1fs before filing for %s", delay, job.steam_id64)
+        # Wait out the minimum gap since the last submission, then add jitter on
+        # top -- randomized, never a fixed tick, since regular timing is the
+        # loudest script tell.
+        gap_remaining = 0.0
+        if self._last_submit is not None:
+            elapsed = time.monotonic() - self._last_submit
+            gap_remaining = max(0.0, MIN_SECONDS_BETWEEN_REPORTS - elapsed)
+
+        delay = gap_remaining + random.uniform(MIN_DELAY_SECONDS, MAX_DELAY_SECONDS)
+        log.info("Waiting %.1fs before filing for %s (%.0fs of that is the "
+                 "per-minute gap)", delay, job.steam_id64, gap_remaining)
         await asyncio.sleep(delay)
+
+        # Count the gap from the attempt, not the success -- a run of failures
+        # must not let the button be clicked without spacing.
+        self._last_submit = time.monotonic()
 
         modal = await self._open_modal()
         self._fill(modal, job)
@@ -174,15 +199,16 @@ class Reporter(selfcord.Client):
 
     # -- pacing --------------------------------------------------------
 
-    def _enforce_rate_limit(self) -> None:
-        cutoff = time.monotonic() - 3600
+    def seconds_until_slot_free(self) -> float:
+        """How long until the hourly cap allows another report. 0 if free now."""
+        now = time.monotonic()
+        cutoff = now - 3600
         while self._recent and self._recent[0] < cutoff:
             self._recent.popleft()
-        if len(self._recent) >= MAX_REPORTS_PER_HOUR:
-            raise ReporterStopped(
-                f"Hourly cap reached ({MAX_REPORTS_PER_HOUR}/hr). "
-                "Restart the bot once things quiet down."
-            )
+        if len(self._recent) < MAX_REPORTS_PER_HOUR:
+            return 0.0
+        # The oldest submission in the window has to age out.
+        return (self._recent[0] + 3600) - now
 
 
 async def start_reporter(notify) -> Reporter:
