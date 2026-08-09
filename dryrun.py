@@ -33,9 +33,12 @@ async def main() -> None:
 
     await asyncio.sleep(8)  # let the gateway connect
 
+    # Placeholder values -- the form is filled in memory and never submitted,
+    # so these never reach anyone. Swap in a real ID only if you need to check
+    # the Steam lookup path too.
     await queue.put(ReportJob(
-        steam_id64=76561199381375361,
-        steam_name="Naps",
+        steam_id64=76561197960287930,
+        steam_name="TestUser",
         server_name="Rustoria EU Long",
         requester_id=0,
         channel_id=0,
