@@ -1,0 +1,9 @@
+discord.py>=2.4.0
+# dolfies/discord.py-self, "renamed" branch -- imports as `selfcord` so it can
+# coexist with discord.py in one venv. Not on PyPI; the PyPI `selfcord.py` is an
+# unrelated project by another author. Pinned because the branch tracks dev.
+selfcord.py @ git+https://github.com/dolfies/discord.py-self@7e2305c4e0926f334e24c439d9e80b80c33cbab4
+aiohttp>=3.9.0
+python-dotenv>=1.0.0
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
