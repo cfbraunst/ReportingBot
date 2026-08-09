@@ -7,9 +7,18 @@ from reporter.jobs import ReportJob
 
 
 class FakeInput:
-    def __init__(self, custom_id):
+    def __init__(self, custom_id, required=True):
         self.custom_id = custom_id
         self.value = None
+        # selfcord parses every field of this form as required, even the ones
+        # the rendered form leaves optional.
+        self.required = required
+
+    def to_submit_dict(self):
+        """Mirrors selfcord's real client-side check."""
+        if self.required and not self.value:
+            raise ValueError("value is required")
+        return {"custom_id": self.custom_id, "value": self.value or ""}
 
 
 class FakeRow:
@@ -61,6 +70,29 @@ def test_evidence_left_empty(filler, job):
     modal = FakeModal()
     filler._fill(modal, job)
     assert modal.inputs()["evidence_input"].value == ""
+
+
+def test_empty_evidence_does_not_block_submit(filler, job):
+    """Regression: selfcord refused to submit because it treats Evidence as
+    required, so a blank one raised ValueError('value is required')."""
+    modal = FakeModal()
+    filler._fill(modal, job)
+    # Every field must now serialize without raising.
+    for c in modal.inputs().values():
+        c.to_submit_dict()
+
+
+def test_required_fields_still_guarded(filler, job):
+    """Clearing `required` must apply only to Evidence -- a genuinely empty
+    required field should still fail loudly rather than submit blank."""
+    modal = FakeModal()
+    filler._fill(modal, job)
+    got = modal.inputs()
+    assert got["username_input"].required is True
+    assert got["steam64id_input"].required is True
+    assert got["server_input"].required is True
+    assert got["reason_input"].required is True
+    assert got["evidence_input"].required is False
 
 
 def test_truncates_long_username(filler, job):

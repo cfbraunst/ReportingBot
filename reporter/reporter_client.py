@@ -193,9 +193,16 @@ class Reporter(selfcord.Client):
         inputs[FIELD_STEAMID].value = str(job.steam_id64)
         inputs[FIELD_SERVER].value = job.server_name[:MAX_SERVER]
         inputs[FIELD_REASON].value = REPORT_REASON
-        # Evidence is optional on this form; left blank deliberately.
+
+        # Evidence is left blank: the rendered form marks only the four fields
+        # above with a red asterisk. selfcord's parsed payload disagrees and
+        # flags every field as required, so its client-side check
+        # (`if self.required and not value: raise ValueError`) would refuse to
+        # submit an empty one. Clear that flag locally and let Discord decide.
         if FIELD_EVIDENCE in inputs:
-            inputs[FIELD_EVIDENCE].value = ""
+            evidence = inputs[FIELD_EVIDENCE]
+            evidence.required = False
+            evidence.value = ""
 
     # -- pacing --------------------------------------------------------
 
