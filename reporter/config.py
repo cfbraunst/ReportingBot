@@ -25,6 +25,10 @@ CUSTOM_SERVER_SENTINEL = "Custom"
 # Always-constant report field.
 REPORT_REASON = "Cheating/Ban Evading"
 
+# Master switch. While false, the reporter opens and fills the form but never
+# submits -- the full path runs with nothing filed. Flip deliberately.
+LIVE_SUBMIT = os.getenv("LIVE_SUBMIT", "false").strip().lower() in ("1", "true", "yes")
+
 # Pacing. These exist to keep the user account from looking scripted.
 MIN_DELAY_SECONDS = 4
 MAX_DELAY_SECONDS = 15
