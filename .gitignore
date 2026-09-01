@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 .pytest_cache/
 discovery_output.json
+.worktrees/
