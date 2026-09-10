@@ -34,7 +34,10 @@ def test_blocks_at_the_cap(limiter):
     wait = limiter.seconds_until_slot_free()
     assert wait > 0
     # The oldest is the newest-1 entries old, so the wait is just under an hour.
-    assert 3500 < wait <= 3600
+    # The upper bound carries a tolerance because seconds_until_slot_free()
+    # computes (entry + 3600) - now, and that rounds a hair above 3600 for some
+    # float values of time.monotonic().
+    assert 3500 < wait <= 3600 + 1e-6
 
 
 def test_wait_shrinks_as_entries_age(limiter):
