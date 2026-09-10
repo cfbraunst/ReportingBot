@@ -3,6 +3,7 @@
 Does no reporting itself -- it validates, resolves the Steam name, and hands a
 job to the queue. The reporter picks it up from there.
 """
+import asyncio
 import logging
 
 import discord
@@ -33,6 +34,24 @@ class CommandBot(discord.Client):
 
     async def on_ready(self) -> None:
         log.info("Command bot online as %s", self.user)
+
+
+async def enqueue_or_reject(
+    interaction: discord.Interaction, job: ReportJob
+) -> int | None:
+    """Enqueue without blocking; tell the caller when there is no room.
+
+    Returns the new queue position, or None if the job was rejected and the
+    user has already been told.
+    """
+    try:
+        queue.put_nowait(job)
+    except asyncio.QueueFull:
+        await interaction.followup.send(
+            "⏳ The report queue is full. Try again after an earlier report finishes."
+        )
+        return None
+    return queue.qsize()
 
 
 @app_commands.command(name="report", description="File a cheater report from a Steam ID.")
@@ -77,17 +96,19 @@ async def report(
         await interaction.followup.send("❌ Couldn't reach Steam. Try again shortly.")
         return
 
-    await queue.put(
-        ReportJob(
-            steam_id64=steam_id64,
-            steam_name=steam_name,
-            server_name=server_name,
-            requester_id=interaction.user.id,
-            channel_id=interaction.channel_id or 0,
-        )
+    job = ReportJob(
+        steam_id64=steam_id64,
+        steam_name=steam_name,
+        server_name=server_name,
+        requester_id=interaction.user.id,
+        channel_id=interaction.channel_id or 0,
     )
+
+    position = await enqueue_or_reject(interaction, job)
+    if position is None:
+        return
 
     await interaction.followup.send(
         f"📋 Queued report for **{steam_name}** (`{steam_id64}`) on **{server_name}**.\n"
-        f"-# Position in queue: {queue.qsize()} · you'll get a confirmation when it's filed."
+        f"-# Position in queue: {position} · you'll get a confirmation when it's filed."
     )

@@ -14,4 +14,7 @@ class ReportJob:
 
 
 # Single shared queue. Both clients live in one process, so this needs no IPC.
-queue: "asyncio.Queue[ReportJob]" = asyncio.Queue()
+# Bounded so a burst of commands can't grow the backlog without limit; the
+# reporter drains it at a few per hour, so anything deeper is already stale.
+MAX_PENDING_REPORTS = 10
+queue: "asyncio.Queue[ReportJob]" = asyncio.Queue(maxsize=MAX_PENDING_REPORTS)
