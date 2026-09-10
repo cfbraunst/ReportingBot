@@ -71,6 +71,11 @@ time, randomized 4–15s delays, and a 10/hour cap. Tune in `reporter/config.py`
 is deleted, or the modal changes shape — a reconfigured ticket tool should stop
 the bot, not make it submit malformed reports.
 
+**Python versions.** Development currently uses Python 3.11, while the Debian 13
+service uses Python 3.13. `audioop-lts` is installed only on 3.13+ because the
+pinned self-account library still imports the standard-library module removed in
+Python 3.13.
+
 ## Form fields
 
 Captured from the live modal (`discovery_output.json`):
