@@ -3,7 +3,13 @@ import asyncio
 import logging
 
 from reporter.command_bot import CommandBot
-from reporter.config import COMMAND_BOT_TOKEN, USER_TOKEN, LIVE_SUBMIT
+from reporter.config import (
+    COMMAND_BOT_TOKEN,
+    ConfigError,
+    LIVE_SUBMIT,
+    USER_TOKEN,
+    validate_config,
+)
 from reporter.reporter_client import Reporter
 
 logging.basicConfig(
@@ -15,8 +21,10 @@ log = logging.getLogger("main")
 
 
 async def main() -> None:
-    if not COMMAND_BOT_TOKEN or not USER_TOKEN:
-        raise SystemExit("COMMAND_BOT_TOKEN and USER_TOKEN must both be set in .env")
+    try:
+        validate_config()
+    except ConfigError as exc:
+        raise SystemExit(str(exc)) from exc
 
     bot = CommandBot()
 
