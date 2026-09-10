@@ -46,10 +46,21 @@ class Reporter(selfcord.Client):
         self._recent = deque()  # submission timestamps, for the hourly cap
         self._last_submit: float | None = None  # for the per-minute gap
         self._halted = False
+        self._worker_task: asyncio.Task | None = None
 
     async def on_ready(self) -> None:
         log.info("Reporter online as %s", self.user)
-        self.loop.create_task(self._worker())
+        self._ensure_worker()
+
+    def _ensure_worker(self) -> asyncio.Task:
+        """One consumer for the shared queue, however often on_ready fires.
+
+        Reconnects re-fire on_ready; without this guard each one would add
+        another consumer racing the others for the same jobs.
+        """
+        if self._worker_task is None or self._worker_task.done():
+            self._worker_task = asyncio.create_task(self._worker())
+        return self._worker_task
 
     async def on_modal(self, modal) -> None:
         # Modals arrive asynchronously after a click, never as click()'s return.
