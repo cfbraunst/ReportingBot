@@ -1,0 +1,28 @@
+[Unit]
+Description=ReportingBot Discord report service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=reportingbot
+Group=reportingbot
+WorkingDirectory=/opt/reportingbot
+ExecStart=/opt/reportingbot/.venv/bin/python /opt/reportingbot/main.py
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=20s
+UMask=0077
+NoNewPrivileges=true
+PrivateDevices=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target
