@@ -37,9 +37,9 @@ async def main() -> None:
     # so these never reach anyone. Swap in a real ID only if you need to check
     # the Steam lookup path too.
     await queue.put(ReportJob(
-        steam_id64=76561197960287930,
+        steam_id64=76561198012345678,
         steam_name="TestUser",
-        server_name="Rustoria EU Long",
+        server_name="EU Long",
         requester_id=0,
         channel_id=0,
     ))
