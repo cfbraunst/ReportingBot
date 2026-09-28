@@ -8,7 +8,9 @@ from reporter.config import (
     ConfigError,
     LIVE_SUBMIT,
     USER_TOKEN,
+    load_wipe_config,
     validate_config,
+    wipe_state_path,
 )
 from reporter.reporter_client import Reporter
 
@@ -26,7 +28,12 @@ async def main() -> None:
     except ConfigError as exc:
         raise SystemExit(str(exc)) from exc
 
-    bot = CommandBot()
+    try:
+        wipe_config = load_wipe_config()
+    except ConfigError as exc:
+        log.error("Wipe monitor disabled: %s", exc)
+        wipe_config = None
+    bot = CommandBot(wipe_config=wipe_config, state_path=wipe_state_path())
 
     async def notify(channel_id: int, text: str) -> None:
         """Reporter results go back through the bot, not the user account."""

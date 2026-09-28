@@ -127,6 +127,29 @@ USER_TOKEN=your_account_token_here
 If the token stops working later, that is expected — see
 [Rotating or revoking the token](#rotating-or-revoking-the-token).
 
+### 5d. Optional wipe reaction checks
+
+The same bot can watch a wipe reaction channel and post duplicate-choice alerts
+to a separate admin channel. With Discord Developer Mode enabled, copy the
+server ID and both channel IDs into `.env`:
+
+```text
+WIPE_GUILD_ID=000000000000000000
+WIPE_CHANNEL_ID=000000000000000000
+WIPE_ADMIN_CHANNEL_ID=000000000000000000
+```
+
+Set all three values together. Leave all three blank to disable the feature.
+The bot needs **View Channel** and **Read Message History** in the wipe channel,
+plus **View Channel** and **Send Messages** in the admin channel. Administrators
+can run `/wipe-check`; its reply is private and searches the latest 1,000
+messages for the newest one with ✅, ⏰ and ❌ reactions.
+
+The systemd unit stores sent-alert history in `/var/lib/reportingbot`, which
+it creates for the service account. If running without systemd, the default is
+`data/wipe_alerts.sqlite3` in the project directory. You can set
+`WIPE_STATE_PATH` to override that location.
+
 ## 6. Point it at a target
 
 No target ships with this repository. You supply one, and you are responsible
@@ -284,6 +307,11 @@ read-only system, an empty capability set. On a Linux host:
 
 Pending reports live in memory, so a restart discards them. The queue holds at
 most ten.
+
+To enable wipe checks in an existing service, add the three `WIPE_*_ID` values
+to its `.env`, install the updated unit, then run `systemctl daemon-reload` and
+`systemctl restart reportingbot`. The unit's `StateDirectory=reportingbot`
+keeps alert history across restarts without making the checkout writable.
 
 ## Troubleshooting
 

@@ -6,6 +6,7 @@ __pycache__/
 .pytest_cache/
 discovery_output.json
 .worktrees/
+data/
 
 # Local planning docs -- contain private infrastructure details.
 docs/superpowers/
