@@ -35,6 +35,8 @@ cp .env.example .env                                          # then fill it in
 | `TARGET_GUILD_ID` / `TARGET_CHANNEL_ID` | Where the report button lives |
 | `TICKET_MESSAGE_ID` / `TICKET_BUTTON_CUSTOM_ID` | From `discover.py` |
 | `LIVE_SUBMIT` | `false` = fill but never submit. See below. |
+| `WIPE_GUILD_ID` / `WIPE_CHANNEL_ID` / `WIPE_ADMIN_CHANNEL_ID` | Optional: server, wipe reaction channel, and separate admin alert channel |
+| `WIPE_STATE_PATH` | Optional alert-state database location; systemd uses its managed state directory by default |
 
 ## Running
 
@@ -58,6 +60,24 @@ On Windows, use `venv/Scripts/python.exe` in place of `python`.
 
 The dropdown presets live in `SERVER_CHOICES` in `reporter/config.py`. Edit them
 to match the servers you play on.
+
+### Wipe reaction checks
+
+Set all three `WIPE_*_ID` values to enable this feature on the existing bot.
+When a message in the wipe channel has ✅, ⏰ and ❌ reactions, the bot checks
+whether anyone selected two or more. It alerts the admin channel once per
+person while the overlap remains. Removing the overlap clears that alert, so a
+new overlap can alert again. It also checks the newest qualifying message at
+startup, including reactions added while the bot was offline. Alerts already
+sent are remembered across restarts.
+
+Server administrators can run `/wipe-check` to see overlaps on the newest
+qualifying message among the latest 1,000 messages in the wipe channel. The
+reply is private to the administrator. It does not send or reset admin alerts.
+
+The bot needs **View Channel** and **Read Message History** in the wipe channel,
+and **View Channel** and **Send Messages** in the admin channel. The monitor
+only uses ordinary reaction events and does not need Message Content intent.
 
 ## LIVE_SUBMIT
 
@@ -136,5 +156,8 @@ journalctl -u reportingbot -f
 
 Pending reports are in memory. Restarting the service discards them. The queue
 accepts at most ten pending reports.
+
+Wipe alert history is saved in the service's private `/var/lib/reportingbot`
+state directory, so a restart does not repeat an alert that was already sent.
 
 Deployment details are in [SETUP.md](SETUP.md#running-as-a-systemd-service).

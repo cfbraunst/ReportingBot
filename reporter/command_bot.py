@@ -5,13 +5,18 @@ job to the queue. The reporter picks it up from there.
 """
 import asyncio
 import logging
+import sqlite3
+from pathlib import Path
 
 import discord
 from discord import app_commands
 
-from reporter.config import SERVER_CHOICES, CUSTOM_SERVER_SENTINEL
+from reporter.config import SERVER_CHOICES, CUSTOM_SERVER_SENTINEL, WipeConfig, wipe_state_path
 from reporter.jobs import ReportJob, queue
 from reporter.steam import lookup, SteamIdError, SteamLookupError
+from reporter.wipe_monitor import WipeMonitor, WipeMonitorError
+from reporter.wipe_reactions import OPTIONS
+from reporter.wipe_state import AlertStore
 
 log = logging.getLogger(__name__)
 
@@ -21,19 +26,58 @@ _CHOICES.append(app_commands.Choice(name="Custom (type it below)", value=CUSTOM_
 
 
 class CommandBot(discord.Client):
-    def __init__(self) -> None:
-        # No privileged intents needed: slash commands arrive as interactions,
-        # so the bot never reads message content.
-        super().__init__(intents=discord.Intents.default())
+    def __init__(
+        self, wipe_config: WipeConfig | None = None, state_path: Path | None = None
+    ) -> None:
+        # Reaction events do not require the privileged Message Content intent.
+        intents = discord.Intents.default()
+        intents.reactions = True
+        super().__init__(intents=intents)
         self.tree = app_commands.CommandTree(self)
+        self.wipe_monitor: WipeMonitor | None = None
+        if wipe_config is not None:
+            try:
+                store = AlertStore(state_path or wipe_state_path())
+                self.wipe_monitor = WipeMonitor(self, wipe_config, store)
+            except (OSError, sqlite3.Error):
+                log.exception("Wipe monitor state could not be opened")
 
     async def setup_hook(self) -> None:
         self.tree.add_command(report)
+        self.tree.add_command(wipe_check)
         await self.tree.sync()
         log.info("Slash commands synced.")
 
     async def on_ready(self) -> None:
         log.info("Command bot online as %s", self.user)
+        if self.wipe_monitor is not None:
+            try:
+                await self.wipe_monitor.startup_check()
+            except (discord.HTTPException, OSError, sqlite3.Error, WipeMonitorError):
+                log.exception("Startup wipe check failed")
+
+    async def _wipe_event(self, payload, *, cleared: bool = False) -> None:
+        if self.wipe_monitor is None:
+            return
+        try:
+            if cleared:
+                await self.wipe_monitor.reactions_cleared(payload)
+            else:
+                await self.wipe_monitor.reaction_changed(payload)
+        except (discord.HTTPException, OSError, sqlite3.Error, WipeMonitorError):
+            log.exception("Wipe reaction check failed")
+
+    async def on_raw_reaction_add(self, payload) -> None:
+        await self._wipe_event(payload)
+
+    async def on_raw_reaction_remove(self, payload) -> None:
+        await self._wipe_event(payload)
+
+    async def on_raw_reaction_clear(self, payload) -> None:
+        await self._wipe_event(payload, cleared=True)
+
+    async def on_raw_reaction_clear_emoji(self, payload) -> None:
+        await self._wipe_event(payload, cleared=True)
 
 
 async def enqueue_or_reject(
@@ -52,6 +96,52 @@ async def enqueue_or_reject(
         )
         return None
     return queue.qsize()
+
+
+@app_commands.command(name="wipe-check", description="Check the latest wipe reactions")
+@app_commands.default_permissions(administrator=True)
+@app_commands.guild_only()
+async def wipe_check(interaction: discord.Interaction) -> None:
+    permissions = getattr(interaction.user, "guild_permissions", None)
+    if not permissions or not permissions.administrator:
+        await interaction.response.send_message("Administrators only.", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True, thinking=True)
+    monitor = getattr(interaction.client, "wipe_monitor", None)
+    if monitor is None or interaction.guild_id != monitor.config.guild_id:
+        await interaction.followup.send("Wipe checking is unavailable here.", ephemeral=True)
+        return
+
+    try:
+        result = await monitor.check_latest()
+    except (discord.HTTPException, OSError, sqlite3.Error, WipeMonitorError):
+        log.exception("Wipe check failed")
+        await interaction.followup.send("Could not finish the wipe check.", ephemeral=True)
+        return
+
+    if result is None:
+        await interaction.followup.send(
+            "No wipe message with all three reactions was found.", ephemeral=True
+        )
+        return
+
+    message, overlaps = result
+    lines = [
+        f"<@{user_id}>: {' '.join(emoji for emoji in OPTIONS if emoji in choices)}"
+        for user_id, choices in sorted(overlaps.items())
+    ]
+    current = f"Wipe message: {message.jump_url}\n"
+    for line in lines or ["No one chose multiple options."]:
+        if len(current) + len(line) + 1 > 1900:
+            await interaction.followup.send(
+                current, ephemeral=True, allowed_mentions=discord.AllowedMentions.none()
+            )
+            current = f"Continued: {message.jump_url}\n"
+        current += line + "\n"
+    await interaction.followup.send(
+        current, ephemeral=True, allowed_mentions=discord.AllowedMentions.none()
+    )
 
 
 @app_commands.command(name="report", description="File a cheater report from a Steam ID.")
