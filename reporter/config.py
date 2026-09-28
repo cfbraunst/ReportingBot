@@ -1,5 +1,7 @@
 """Central config. Everything secret comes from .env, never from source."""
 import os
+from dataclasses import dataclass
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -7,6 +9,34 @@ load_dotenv()
 
 class ConfigError(ValueError):
     """Required environment configuration is missing or invalid."""
+
+
+@dataclass(frozen=True)
+class WipeConfig:
+    guild_id: int
+    channel_id: int
+    admin_channel_id: int
+
+
+def load_wipe_config() -> WipeConfig | None:
+    """Return optional wipe channels, or reject an incomplete configuration."""
+    names = ("WIPE_GUILD_ID", "WIPE_CHANNEL_ID", "WIPE_ADMIN_CHANNEL_ID")
+    raw = {name: os.getenv(name, "").strip() for name in names}
+    if not any(raw.values()):
+        return None
+    invalid = [name for name, value in raw.items() if not value.isdecimal() or int(value) <= 0]
+    if invalid:
+        raise ConfigError("Missing or invalid wipe configuration: " + ", ".join(invalid))
+    return WipeConfig(*(int(raw[name]) for name in names))
+
+
+def wipe_state_path() -> Path:
+    """Use managed systemd storage in production and a local path otherwise."""
+    override = os.getenv("WIPE_STATE_PATH", "").strip()
+    if override:
+        return Path(override)
+    directory = os.getenv("STATE_DIRECTORY", "").strip()
+    return Path(directory or "data") / "wipe_alerts.sqlite3"
 
 
 def _env_int(name: str) -> int:
