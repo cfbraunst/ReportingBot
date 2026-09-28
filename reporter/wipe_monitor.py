@@ -23,22 +23,35 @@ class WipeMonitor:
     async def reconcile_message(self, message: discord.Message) -> None:
         lock = self._locks.setdefault(message.id, asyncio.Lock())
         async with lock:
-            current = await overlaps_for_message(message, self.bot.user.id)
-            guild_id, message_id = self.config.guild_id, message.id
-            if current is None:
-                self.store.clear_message(guild_id, message_id)
-                return
+            await self._reconcile_locked(message)
 
-            sent = self.store.active_users(guild_id, message_id)
-            self.store.clear_except(guild_id, message_id, set(current))
-            for user_id, choices in current.items():
-                if user_id in sent:
-                    continue
-                admin = await self._channel(self.config.admin_channel_id)
-                selected = " ".join(emoji for emoji in OPTIONS if emoji in choices)
-                text = f"<@{user_id}> selected {selected} on {message.jump_url}"
-                await admin.send(text, allowed_mentions=discord.AllowedMentions.none())
-                self.store.mark_sent(guild_id, message_id, user_id, choices)
+    async def _reconcile_locked(self, message: discord.Message) -> None:
+        current = await overlaps_for_message(message, self.bot.user.id)
+        guild_id, message_id = self.config.guild_id, message.id
+        if current is None:
+            self.store.clear_message(guild_id, message_id)
+            return
+
+        sent = self.store.active_users(guild_id, message_id)
+        self.store.clear_except(guild_id, message_id, set(current))
+        for user_id, choices in current.items():
+            if user_id in sent:
+                continue
+            admin = await self._channel(self.config.admin_channel_id)
+            selected = " ".join(emoji for emoji in OPTIONS if emoji in choices)
+            text = f"<@{user_id}> selected {selected} on {message.jump_url}"
+            await admin.send(text, allowed_mentions=discord.AllowedMentions.none())
+            self.store.mark_sent(guild_id, message_id, user_id, choices)
+
+    async def _refresh_and_reconcile(self, source: discord.TextChannel, message_id: int) -> None:
+        lock = self._locks.setdefault(message_id, asyncio.Lock())
+        async with lock:
+            try:
+                message = await source.fetch_message(message_id)
+            except discord.NotFound:
+                self.store.clear_message(self.config.guild_id, message_id)
+                return
+            await self._reconcile_locked(message)
 
     async def _channel(self, channel_id: int) -> discord.TextChannel:
         channel = self.bot.get_channel(channel_id)
@@ -58,12 +71,7 @@ class WipeMonitor:
         ):
             return
         source = await self._channel(self.config.channel_id)
-        try:
-            message = await source.fetch_message(payload.message_id)
-        except discord.NotFound:
-            self.store.clear_message(self.config.guild_id, payload.message_id)
-            return
-        await self.reconcile_message(message)
+        await self._refresh_and_reconcile(source, payload.message_id)
 
     async def reactions_cleared(self, payload) -> None:
         if (
@@ -75,12 +83,7 @@ class WipeMonitor:
         if emoji is not None and str(emoji) not in OPTIONS:
             return
         source = await self._channel(self.config.channel_id)
-        try:
-            message = await source.fetch_message(payload.message_id)
-        except discord.NotFound:
-            self.store.clear_message(self.config.guild_id, payload.message_id)
-            return
-        await self.reconcile_message(message)
+        await self._refresh_and_reconcile(source, payload.message_id)
 
     async def check_latest(self) -> tuple[discord.Message, dict[int, frozenset[str]]] | None:
         source = await self._channel(self.config.channel_id)
@@ -95,4 +98,5 @@ class WipeMonitor:
     async def startup_check(self) -> None:
         result = await self.check_latest()
         if result is not None:
-            await self.reconcile_message(result[0])
+            source = await self._channel(self.config.channel_id)
+            await self._refresh_and_reconcile(source, result[0].id)

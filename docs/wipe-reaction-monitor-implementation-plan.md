@@ -537,22 +537,28 @@ class WipeMonitor:
     async def reconcile_message(self, message):
         lock = self._locks.setdefault(message.id, asyncio.Lock())
         async with lock:
-            current = await overlaps_for_message(message, self.bot.user.id)
-            guild_id, message_id = self.config.guild_id, message.id
-            if current is None:
-                self.store.clear_message(guild_id, message_id)
+            await self._reconcile_locked(message)
+
+    async def _reconcile_locked(self, message):
+        # Read overlaps, update the store, send alerts, and mark them sent.
+        # See the completed implementation for the full body.
+        ...
+
+    async def _refresh_and_reconcile(self, source, message_id):
+        lock = self._locks.setdefault(message_id, asyncio.Lock())
+        async with lock:
+            try:
+                message = await source.fetch_message(message_id)
+            except discord.NotFound:
+                self.store.clear_message(self.config.guild_id, message_id)
                 return
-            sent = self.store.active_users(guild_id, message_id)
-            self.store.clear_except(guild_id, message_id, set(current))
-            for user_id, choices in current.items():
-                if user_id in sent:
-                    continue
-                admin = await self._channel(self.config.admin_channel_id)
-                text = (f"<@{user_id}> selected {' '.join(sorted(choices))} "
-                        f"on {message.jump_url}")
-                await admin.send(text, allowed_mentions=discord.AllowedMentions.none())
-                self.store.mark_sent(guild_id, message_id, user_id, choices)
+            await self._reconcile_locked(message)
 ~~~
+
+The fetch and reconciliation must share one lock. Otherwise concurrent raw
+events can process an older fetched snapshot after a newer one and clear a
+valid sent-alert record. The implementation in `reporter/wipe_monitor.py`
+contains the full `_reconcile_locked` body.
 
 Add these methods inside WipeMonitor. The source and admin channels must both be text channels in the configured guild. A missing channel or wrong guild raises WipeMonitorError; Discord permission errors propagate to the bot handler.
 
@@ -573,12 +579,7 @@ Add these methods inside WipeMonitor. The source and admin channels must both be
                 or str(payload.emoji) not in OPTIONS):
             return
         source = await self._channel(self.config.channel_id)
-        try:
-            message = await source.fetch_message(payload.message_id)
-        except discord.NotFound:
-            self.store.clear_message(self.config.guild_id, payload.message_id)
-            return
-        await self.reconcile_message(message)
+        await self._refresh_and_reconcile(source, payload.message_id)
 
     async def reactions_cleared(self, payload) -> None:
         if (payload.guild_id != self.config.guild_id
@@ -588,12 +589,7 @@ Add these methods inside WipeMonitor. The source and admin channels must both be
         if emoji is not None and str(emoji) not in OPTIONS:
             return
         source = await self._channel(self.config.channel_id)
-        try:
-            message = await source.fetch_message(payload.message_id)
-        except discord.NotFound:
-            self.store.clear_message(self.config.guild_id, payload.message_id)
-            return
-        await self.reconcile_message(message)
+        await self._refresh_and_reconcile(source, payload.message_id)
 
     async def check_latest(self):
         source = await self._channel(self.config.channel_id)
@@ -608,7 +604,8 @@ Add these methods inside WipeMonitor. The source and admin channels must both be
     async def startup_check(self) -> None:
         result = await self.check_latest()
         if result is not None:
-            await self.reconcile_message(result[0])
+            source = await self._channel(self.config.channel_id)
+            await self._refresh_and_reconcile(source, result[0].id)
 ~~~
 
 - [ ] **Step 4: Run event tests, full suite, and commit.**
