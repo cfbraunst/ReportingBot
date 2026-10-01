@@ -19,10 +19,20 @@ server and fills it in.
 Step-by-step instructions, including how to obtain every credential, are in
 **[SETUP.md](SETUP.md)**. The short version:
 
+Linux / macOS:
+
 ```bash
+python3 -m venv venv
+venv/bin/python -m pip install -r requirements.txt
+cp .env.example .env          # then fill it in
+```
+
+Windows (PowerShell):
+
+```powershell
 python -m venv venv
-venv/Scripts/python.exe -m pip install -r requirements.txt   # Windows
-cp .env.example .env                                          # then fill it in
+venv\Scripts\python.exe -m pip install -r requirements.txt
+Copy-Item .env.example .env   # then fill it in
 ```
 
 `.env` needs:
@@ -34,6 +44,7 @@ cp .env.example .env                                          # then fill it in
 | `USER_TOKEN` | A Discord account token, for the reporter |
 | `TARGET_GUILD_ID` / `TARGET_CHANNEL_ID` | Where the report button lives |
 | `TICKET_MESSAGE_ID` / `TICKET_BUTTON_CUSTOM_ID` | From `discover.py` |
+| `SERVER_CHOICES` | Optional: comma-separated presets for the `/report` dropdown |
 | `LIVE_SUBMIT` | `false` = fill but never submit. See below. |
 | `WIPE_GUILD_ID` / `WIPE_CHANNEL_ID` / `WIPE_ADMIN_CHANNEL_ID` | Optional: server, wipe reaction channel, and separate admin alert channel |
 | `WIPE_STATE_PATH` | Optional alert-state database location; systemd uses its managed state directory by default |
@@ -58,8 +69,8 @@ On Windows, use `venv/Scripts/python.exe` in place of `python`.
 
 `steam_id` accepts SteamID64, profile and vanity URLs, `STEAM_0:...`, and `[U:1:...]`.
 
-The dropdown presets live in `SERVER_CHOICES` in `reporter/config.py`. Edit them
-to match the servers you play on.
+The dropdown presets come from `SERVER_CHOICES` in `.env`, as a comma-separated
+list. **Custom** is always offered, so the list can be left blank.
 
 ### Wipe reaction checks
 

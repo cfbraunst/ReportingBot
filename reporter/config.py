@@ -55,13 +55,17 @@ TARGET_CHANNEL_ID = _env_int("TARGET_CHANNEL_ID")
 TICKET_MESSAGE_ID = _env_int("TICKET_MESSAGE_ID")
 TICKET_BUTTON_CUSTOM_ID = os.getenv("TICKET_BUTTON_CUSTOM_ID", "")
 
-# The four presets, exactly as given. Two communities: Rustoria and Rustopia.
-SERVER_CHOICES = [
-    "Rustoria EU Long",
-    "Rustoria EU Medium",
-    "Rustopia EU Large",
-    "Rustopia EU Medium",
-]
+# Discord allows 25 choices per option; one of them is always Custom.
+MAX_SERVER_CHOICES = 24
+
+
+def _server_choices() -> list[str]:
+    """Dropdown presets for /report, comma-separated in SERVER_CHOICES."""
+    names = (name.strip() for name in os.getenv("SERVER_CHOICES", "").split(","))
+    return list(dict.fromkeys(name for name in names if name))
+
+
+SERVER_CHOICES = _server_choices()
 CUSTOM_SERVER_SENTINEL = "Custom"
 
 # Always-constant report field.
@@ -103,6 +107,8 @@ def validate_config() -> None:
         "TICKET_BUTTON_CUSTOM_ID": TICKET_BUTTON_CUSTOM_ID,
     }
     invalid = sorted(name for name, value in values.items() if _is_unset(value))
+    if len(SERVER_CHOICES) > MAX_SERVER_CHOICES:
+        invalid.append(f"SERVER_CHOICES (at most {MAX_SERVER_CHOICES} names)")
     if invalid:
         raise ConfigError(
             "Missing or invalid required configuration: " + ", ".join(invalid)

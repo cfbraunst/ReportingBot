@@ -56,3 +56,22 @@ def test_env_int_returns_zero_for_missing_or_malformed_values(monkeypatch):
     assert config._env_int("TEST_ID") == 0
     monkeypatch.setenv("TEST_ID", "42")
     assert config._env_int("TEST_ID") == 42
+
+
+def test_server_choices_parses_trims_and_dedupes(monkeypatch):
+    monkeypatch.setenv("SERVER_CHOICES", " EU Long, EU Medium,,EU Long ,  ")
+    assert config._server_choices() == ["EU Long", "EU Medium"]
+
+
+def test_server_choices_defaults_to_empty(monkeypatch):
+    monkeypatch.delenv("SERVER_CHOICES", raising=False)
+    assert config._server_choices() == []
+
+
+def test_validate_config_rejects_too_many_server_choices(monkeypatch):
+    set_required(monkeypatch)
+    names = [f"Server {i}" for i in range(config.MAX_SERVER_CHOICES + 1)]
+    monkeypatch.setattr(config, "SERVER_CHOICES", names)
+
+    with pytest.raises(config.ConfigError, match="SERVER_CHOICES"):
+        config.validate_config()

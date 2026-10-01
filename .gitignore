@@ -10,3 +10,5 @@ data/
 
 # Local planning docs -- contain private infrastructure details.
 docs/superpowers/
+docs/wipe-reaction-monitor-design.md
+docs/wipe-reaction-monitor-implementation-plan.md

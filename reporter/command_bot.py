@@ -20,7 +20,7 @@ from reporter.wipe_state import AlertStore
 
 log = logging.getLogger(__name__)
 
-# The four presets plus Custom. Discord caps choices at 25, so this is safe.
+# Presets from SERVER_CHOICES plus Custom. validate_config caps the presets at 24.
 _CHOICES = [app_commands.Choice(name=s, value=s) for s in SERVER_CHOICES]
 _CHOICES.append(app_commands.Choice(name="Custom (type it below)", value=CUSTOM_SERVER_SENTINEL))
 

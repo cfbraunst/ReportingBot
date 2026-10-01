@@ -44,9 +44,16 @@ source venv/bin/activate
 
 Windows (PowerShell):
 
-```bash
+```powershell
 python -m venv venv
 venv\Scripts\Activate.ps1
+```
+
+If PowerShell refuses with *"running scripts is disabled on this system"*,
+allow local scripts for your user once, then activate again:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 ```
 
 Every later `python` command assumes this environment is active. If you would
@@ -73,8 +80,16 @@ All tests should pass. They are fully offline: no Discord or Steam calls.
 
 ## 5. Create your `.env`
 
+Linux / macOS:
+
 ```bash
 cp .env.example .env
+```
+
+Windows (PowerShell):
+
+```powershell
+Copy-Item .env.example .env
 ```
 
 `.env` is gitignored. Never commit it, and never paste its contents anywhere.
@@ -204,8 +219,12 @@ in `reporter/config.py` — to match. You do not have to guess: the reporter
 **halts instead of submitting** when the modal lacks the fields it expects, and
 the log names the ones that are missing.
 
-While you are in `reporter/config.py`, set `SERVER_CHOICES` to the servers you
-actually play on. They become the `/report` dropdown.
+Finally, list the servers you play on in `.env`. They become the `/report`
+dropdown; **Custom** is always added, so you can leave this blank:
+
+```
+SERVER_CHOICES=EU Long,EU Medium,US Main
+```
 
 ## 8. Dry run
 

@@ -50,7 +50,7 @@ def job():
     return ReportJob(
         steam_id64=76561198012345678,
         steam_name="SomePlayer",
-        server_name="Rustoria EU Long",
+        server_name="EU Long",
         requester_id=1,
         channel_id=2,
     )
@@ -62,7 +62,7 @@ def test_fills_every_field(filler, job):
     got = modal.inputs()
     assert got["username_input"].value == "SomePlayer"
     assert got["steam64id_input"].value == "76561198012345678"
-    assert got["server_input"].value == "Rustoria EU Long"
+    assert got["server_input"].value == "EU Long"
     assert got["reason_input"].value == REPORT_REASON
 
 

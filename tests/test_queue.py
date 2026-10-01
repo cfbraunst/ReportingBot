@@ -23,7 +23,7 @@ def make_job(number=1):
     return ReportJob(
         steam_id64=76561198000000000 + number,
         steam_name=f"Player{number}",
-        server_name="Rustoria EU Long",
+        server_name="EU Long",
         requester_id=1,
         channel_id=2,
     )
