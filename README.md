@@ -12,7 +12,8 @@ server and fills it in.
 > files reports into a third-party moderation system, where a wrong Steam ID
 > has real consequences for whoever owns it. See
 > [Account risk](#account-risk) and [LIVE_SUBMIT](#live_submit) below.
-> No target server ships with this repo — you supply your own.
+> `.env.example` comes pre-filled with the default target; see SETUP.md step 6
+> to aim it elsewhere.
 
 ## Setup
 

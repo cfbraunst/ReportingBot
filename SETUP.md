@@ -167,8 +167,16 @@ it creates for the service account. If running without systemd, the default is
 
 ## 6. Point it at a target
 
-No target ships with this repository. You supply one, and you are responsible
-for whether you are entitled to automate against it.
+`.env.example` already holds the default target's four values
+(`TARGET_GUILD_ID`, `TARGET_CHANNEL_ID`, `TICKET_MESSAGE_ID`,
+`TICKET_BUTTON_CUSTOM_ID`), so if you copied it in step 5 there is nothing to
+do here — as long as the account behind `USER_TOKEN` is in that server and can
+use the report button. Skip to [step 7](#7-check-the-form-fields-match).
+
+Follow the rest of this step only to aim it at a different server, or when
+the default target posts a new ticket message and the reporter reports
+`Ticket message ... is gone`. Whichever target you use, you are responsible for
+whether you are entitled to automate against it.
 
 **Enable Developer Mode** in Discord: *Settings → Advanced → Developer Mode*.
 You can now right-click things and **Copy ID**.
